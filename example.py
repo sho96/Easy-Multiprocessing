@@ -12,12 +12,7 @@ def someHeavyFunction(x):
 
 reuslts = mp.process(
     someHeavyFunction, 
-    [
-        (10000000, ),
-        (10000000, ),
-        (10000000, ),
-        (10000000, ),
-    ]
+    [10000000, 10000000, 10000000, 10000000]
 )
 
 print(reuslts)

@@ -4,7 +4,8 @@ import pickle
 from threading import Thread, Lock
 import inspect
 import ast
-
+import tempfile
+import os
 
 mutex = Lock()
 processResults = {}
@@ -45,15 +46,35 @@ def get_import_statements(script_text):
         print(f"Error parsing the script: {e}")
         return []
 
-def runProcessFromFunctionObj(processID, imports, function, args):
+def runProcessThread(processID, imports, function, args):
+    global processResults
     source = inspect.getsource(function)
-    pickled = pickle.dumps(args)
-    codeToRun = f"import pickle\n{imports}\n{source}\n\noutput = {function.__name__}(*pickle.loads({pickled}))\nprint(pickle.dumps(output))"
-    outputstr = subprocess.check_output([python_executable, "-c", codeToRun], universal_newlines=True)
-    output = pickle.loads(eval(outputstr))
-    with mutex:
-        processResults[processID] = output
+    pickled_args = pickle.dumps(args)
+    
+    # Create a temporary file to store the script
+    with tempfile.NamedTemporaryFile(mode='w+', delete=False, suffix='.py') as temp_file:
+        code_to_run = f"""\
+import pickle
 
+{imports}
+
+{source}
+
+args = pickle.loads({pickled_args})
+output = {function.__name__}({"" if len(inspect.signature(function).parameters) == 1 else ""}args)
+print(pickle.dumps(output))
+"""
+        temp_file.write(code_to_run)
+        temp_file_name = temp_file.name
+    
+    try:
+        output_str = subprocess.check_output([python_executable, temp_file_name], universal_newlines=True)
+        output = pickle.loads(eval(output_str))
+        
+        with mutex:
+            processResults[processID] = output
+    finally:
+        os.remove(temp_file_name)
 
 def process(function, args, imports=""):
     global importStatements
@@ -64,7 +85,7 @@ def process(function, args, imports=""):
 
     threads = []
     for i, arg in enumerate(args):
-        thread = Thread(target=runProcessFromFunctionObj, args=(i, imports, function, arg))
+        thread = Thread(target=runProcessThread, args=(i, imports, function, arg))
         thread.start()
     while len(processResults) < len(args):
         pass
