@@ -45,15 +45,15 @@ def get_import_statements(script_text):
         print(f"Error parsing the script: {e}")
         return []
 
-def runProcessThread(processID, imports, function, args):
+def runProcessFromFunctionObj(processID, imports, function, args):
     source = inspect.getsource(function)
     pickled = pickle.dumps(args)
-    codeToRun = f"import pickle\n{imports}\n{source}\n\noutput = {function.__name__}(*pickle.loads({pickled}))\nprint(pickle.dumps(output))"
     codeToRun = f"import pickle\n{imports}\n{source}\n\noutput = {function.__name__}(*pickle.loads({pickled}))\nprint(pickle.dumps(output))"
     outputstr = subprocess.check_output([python_executable, "-c", codeToRun], universal_newlines=True)
     output = pickle.loads(eval(outputstr))
     with mutex:
         processResults[processID] = output
+
 
 def process(function, args, imports=""):
     global importStatements
@@ -64,7 +64,7 @@ def process(function, args, imports=""):
 
     threads = []
     for i, arg in enumerate(args):
-        thread = Thread(target=runProcessThread, args=(i, imports, function, arg))
+        thread = Thread(target=runProcessFromFunctionObj, args=(i, imports, function, arg))
         thread.start()
     while len(processResults) < len(args):
         pass
