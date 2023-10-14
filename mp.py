@@ -2,9 +2,7 @@ import subprocess
 import sys
 import pickle
 from threading import Thread, Lock
-import queue
 import inspect
-import os
 import ast
 
 
